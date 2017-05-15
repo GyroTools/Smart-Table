@@ -141,10 +141,28 @@ ng.module('smart-table')
      * selected row, so all in between will either be selected or deselected. If there was no previously
      * selected row, extend will just select the current row.
      * @param {Object} row - the row to select
-     * @param {String} [mode] - "single" or "multiple" (multiple by default)
-     * @param {Boolean} [extend] - extend the state of the last selected row. Works only in "multiple" mode
+     * @param {String} [mode] - "single" or "multiple" or "multiple2" (multiple by default).
+     * Multiple2 selects multiple rows only if CTRL or SHIFT key has been pressed. A click without any key pressed
+     * deselects all rows expect the one that has been clicked.
+     * @param {Number} [key] - presses keyboard key. SHIFT=1, CTRL=2. Works only in "multiple" mode
      */
-    this.select = function select (row, mode, extend) {
+    this.select = function select (row, mode, key) {
+
+      function shiftSelect(row, index) {
+        var lastIndex = rows.indexOf(lastSelected);
+        var state = lastSelected.isSelected;
+        var min = Math.min(lastIndex, index);
+        var max = Math.max(lastIndex, index);
+        for(var i = min; i <= max; i++)
+          rows[i].isSelected = state;
+        lastSelected = row;
+      }
+
+      function multiSelect(row, index) {
+        rows[index].isSelected = !rows[index].isSelected;
+        lastSelected = row;
+      }
+
       var rows = copyRefs(displayGetter($scope));
       var index = rows.indexOf(row);
       if (index !== -1) {
@@ -154,18 +172,28 @@ ng.module('smart-table')
             lastSelected.isSelected = false;
           }
           lastSelected = row.isSelected === true ? row : undefined;
-        } else {
-          if(extend && lastSelected) {
-        	  var lastIndex = rows.indexOf(lastSelected);
-        	  var state = lastSelected.isSelected;
-        	  var min = Math.min(lastIndex, index);
-        	  var max = Math.max(lastIndex, index);
-        	  for(var i = min; i <= max; i++)
-        		  rows[i].isSelected = state;
-          } else {
-        	rows[index].isSelected = !rows[index].isSelected;
+        }
+        else if (mode === 'multiple2') {
+          if(key === 1 && lastSelected) {
+            shiftSelect(row, index);
           }
-          lastSelected = row;
+          else if (key === 2) {
+            multiSelect(row, index);
+          }
+          else {
+            for(var i = 0; i < rows.length; i++) {
+              rows[i].isSelected = false
+            }
+            row.isSelected = row.isSelected !== true;
+            lastSelected = row.isSelected === true ? row : undefined;
+          }
+        }
+        else {
+          if(key === 1 && lastSelected) {
+            shiftSelect(row, index);
+          } else {
+            multiSelect(row, index);
+          }
         }
       }
     };

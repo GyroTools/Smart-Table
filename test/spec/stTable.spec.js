@@ -378,6 +378,71 @@ describe('st table Controller', function () {
         expect(selected).toEqual([scope.data[4]]);
       });
     });
+
+    describe('select-multiple2', function () {
+
+      function getSelected(array) {
+        return array.filter(function (val) {
+          return val.isSelected === true;
+        });
+      }
+
+      it('should select only a single row at the time', function () {
+        ctrl.select(scope.data[3], 'multiple2');
+        var selected = getSelected(scope.data);
+        expect(selected.length).toBe(1);
+        expect(selected[0]).toEqual(scope.data[3]);
+
+        ctrl.select(scope.data[2], 'single');
+
+        selected = getSelected(scope.data);
+
+        expect(selected.length).toBe(1);
+        expect(selected[0]).toEqual(scope.data[2]);
+      });
+
+      it('should unselect an item', function () {
+        ctrl.select(scope.data[3], 'multiple2');
+        var selected = getSelected(scope.data);
+        expect(selected.length).toBe(1);
+        expect(selected[0]).toEqual(scope.data[3]);
+
+        ctrl.select(scope.data[3], 'single');
+
+        selected = getSelected(scope.data);
+
+        expect(selected.length).toBe(0);
+      });
+
+      it('should select multiple row if CTRL is held', function () {
+        ctrl.select(scope.data[2], 'multiple2');
+        ctrl.select(scope.data[4], 'multiple2', 2);
+        var selected = getSelected(scope.data);
+        expect(selected.length).toBe(2);
+        expect(selected).toEqual([scope.data[2], scope.data[4]]);
+      });
+
+      it('should select multiple row if SHIFT is held', function () {
+        ctrl.select(scope.data[2], 'multiple2');
+        ctrl.select(scope.data[4], 'multiple2', 1);
+        var selected = getSelected(scope.data);
+        expect(selected.length).toBe(3);
+        expect(selected).toEqual([scope.data[2], scope.data[3], scope.data[4]]);
+      });
+
+      it('should select onw row and deselect all others', function () {
+        ctrl.select(scope.data[2], 'multiple2');
+        ctrl.select(scope.data[4], 'multiple2', 2);
+        ctrl.select(scope.data[1], 'multiple2', 2);
+        var selected = getSelected(scope.data);
+        expect(selected.length).toBe(3);
+        expect(selected).toEqual([scope.data[1], scope.data[2], scope.data[4]]);
+        ctrl.select(scope.data[3], 'multiple2');
+        selected = getSelected(scope.data);
+        expect(selected.length).toBe(1);
+        expect(selected).toEqual([scope.data[3]]);
+      });
+    });
   });
 
   describe('with safeSrc', function () {

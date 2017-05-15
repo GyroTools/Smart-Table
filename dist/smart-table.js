@@ -59,6 +59,7 @@ ng.module('smart-table')
     var filtered;
     var pipeAfterSafeCopy = true;
     var ctrl = this;
+    /** the last row that has been selected (or unselected) */
     var lastSelected;
 
     function copyRefs (src) {
@@ -160,6 +161,8 @@ ng.module('smart-table')
     this.pipe = function pipe () {
       var pagination = tableState.pagination;
       var output;
+      if(lastSelected) //if selection has been used, clear all selections
+    	  this.selectAll(safeCopy, false);
       filtered = tableState.search.predicateObject ? filter(safeCopy, tableState.search.predicateObject) : safeCopy;
       if (tableState.sort.predicate) {
         filtered = orderBy(filtered, tableState.sort.predicate, tableState.sort.reverse);
@@ -174,11 +177,33 @@ ng.module('smart-table')
     };
 
     /**
-     * select a dataRow (it will add the attribute isSelected to the row object)
+     * select a dataRow (it will add the attribute isSelected to the row object) or extend selection
+     * Extension means that the state of the last row that was selected is extended through to the currently
+     * selected row, so all in between will either be selected or deselected. If there was no previously
+     * selected row, extend will just select the current row.
      * @param {Object} row - the row to select
-     * @param {String} [mode] - "single" or "multiple" (multiple by default)
+     * @param {String} [mode] - "single" or "multiple" or "multiple2" (multiple by default).
+     * Multiple2 selects multiple rows only if CTRL or SHIFT key has been pressed. A click without any key pressed
+     * deselects all rows expect the one that has been clicked.
+     * @param {Number} [key] - presses keyboard key. SHIFT=1, CTRL=2. Works only in "multiple" mode
      */
-    this.select = function select (row, mode) {
+    this.select = function select (row, mode, key) {
+
+      function shiftSelect(row, index) {
+        var lastIndex = rows.indexOf(lastSelected);
+        var state = lastSelected.isSelected;
+        var min = Math.min(lastIndex, index);
+        var max = Math.max(lastIndex, index);
+        for(var i = min; i <= max; i++)
+          rows[i].isSelected = state;
+        lastSelected = row;
+      }
+
+      function multiSelect(row, index) {
+        rows[index].isSelected = !rows[index].isSelected;
+        lastSelected = row;
+      }
+
       var rows = copyRefs(displayGetter($scope));
       var index = rows.indexOf(row);
       if (index !== -1) {
@@ -188,11 +213,43 @@ ng.module('smart-table')
             lastSelected.isSelected = false;
           }
           lastSelected = row.isSelected === true ? row : undefined;
-        } else {
-          rows[index].isSelected = !rows[index].isSelected;
+        }
+        else if (mode === 'multiple2') {
+          if(key === 1 && lastSelected) {
+            shiftSelect(row, index);
+          }
+          else if (key === 2) {
+            multiSelect(row, index);
+          }
+          else {
+            for(var i = 0; i < rows.length; i++) {
+              rows[i].isSelected = false
+            }
+            row.isSelected = row.isSelected !== true;
+            lastSelected = row.isSelected === true ? row : undefined;
+          }
+        }
+        else {
+          if(key === 1 && lastSelected) {
+            shiftSelect(row, index);
+          } else {
+            multiSelect(row, index);
+          }
         }
       }
     };
+    
+    /**
+     * select or de-select all rows.
+     * @param {Collection} rows - The array of rows to select or deselect
+     * @param {Boolean} state - The target state. If falsey, selectionUsed will also be reset
+     */
+    this.selectAll = function selectAll (rows, state) {
+    	for(var i = 0; i < rows.length; i++)
+    		rows[i].isSelected = state;
+    	if(!state)
+    		lastSelected = undefined;
+    } 
 
     /**
      * take a slice of the current sorted/filtered collection (pagination)
@@ -313,9 +370,9 @@ ng.module('smart-table')
       },
       link: function (scope, element, attr, ctrl) {
         var mode = attr.stSelectMode || stConfig.select.mode;
-        element.bind('click', function () {
+        element.bind('click', function ($event) {
           scope.$apply(function () {
-            ctrl.select(scope.row, mode);
+            ctrl.select(scope.row, mode, $event.shiftKey ? 1 : ($event.ctrlKey ? 2 : 0));
           });
         });
 
@@ -326,6 +383,35 @@ ng.module('smart-table')
             element.removeClass(stConfig.select.selectedClass);
           }
         });
+      }
+    };
+  }])
+  .directive('stSelectRowCtrl', ['stConfig', function (stConfig) {
+    return {
+      restrict: 'A',
+      require: '^stTable',
+      scope: {
+        row: '=stSelectRowCtrl'
+      },
+      link: function (scope, element, attr, ctrl) {
+        var mode = attr.stSelectMode || stConfig.select.mode;
+        if (mode == 'multiple2') {
+          element.bind('click', function ($event) {
+            $event.stopPropagation();
+            scope.$apply(function () {
+              ctrl.select(scope.row, mode, 2);
+             });
+          });
+
+          scope.$watch('row.isSelected', function (newValue) {
+            if (newValue === true) {
+              element.addClass(stConfig.select.selectedClass);
+            } else {
+              element.removeClass(stConfig.select.selectedClass);
+            }
+          });
+        }
+
       }
     };
   }]);
